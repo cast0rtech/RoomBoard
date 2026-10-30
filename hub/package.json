@@ -1,0 +1,34 @@
+{
+  "name": "roomboard-hub",
+  "version": "0.1.0",
+  "description": "Servicio local Hub de RoomBoard para Microsoft Graph y clientes Flutter",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "format": "prettier --write src"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.2",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^20.17.19",
+    "eslint": "^9.20.0",
+    "prettier": "^3.5.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^3.0.6"
+  }
+}

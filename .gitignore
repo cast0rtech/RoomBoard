@@ -1,0 +1,32 @@
+# General
+.DS_Store
+Thumbs.db
+*.log
+
+# Secretos y variables de entorno
+.env
+.env.*
+!.env.example
+*.cache.json
+.msal-cache*
+
+# Hub (Node.js / TypeScript)
+node_modules/
+hub/node_modules/
+hub/dist/
+hub/coverage/
+
+# App (Flutter / Dart)
+app/.dart_tool/
+app/.packages
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.metadata
+app/pubspec.lock
+app/android/.gradle/
+app/android/captures/
+app/android/local.properties
+app/android/key.properties
+app/android/**/*.iml
+app/windows/flutter/ephemeral/

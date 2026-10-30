@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+      NOTA DE SEGURIDAD:
+      Se habilita cleartextTrafficPermitted="true" únicamente para permitir que el tablet Android
+      se comunique por HTTP con el Hub de RoomBoard dentro de una red local aislada (LAN/VLAN).
+      En entornos de producción es altamente recomendable configurar TLS/HTTPS en el Hub
+      (o un proxy inverso local con certificado interno) y desactivar el tráfico en claro.
+    -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
