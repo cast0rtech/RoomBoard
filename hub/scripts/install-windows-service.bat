@@ -54,3 +54,4 @@ echo Servicio %SERVICE_NAME% instalado e iniciado con exito.
 echo Para comprobar estado: nssm status %SERVICE_NAME%
 echo Para ver logs: %LOG_DIR%\hub-service.log
 echo ============================================================================
+
