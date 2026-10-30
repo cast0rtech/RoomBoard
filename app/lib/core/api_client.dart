@@ -135,43 +135,11 @@ class ApiClient {
     }
   }
 
-  /// Realiza una reserva rápida de una sala (`POST /api/rooms/:id/book`).
-  Future<Event> bookRoom(
-    String roomId,
-    int minutes, {
-    String? subject,
-  }) async {
-    try {
-      final encodedId = Uri.encodeComponent(roomId);
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/rooms/$encodedId/book',
-        data: <String, dynamic>{
-          'minutes': minutes,
-          if (subject != null && subject.isNotEmpty) 'subject': subject,
-        },
-        options: Options(headers: <String, dynamic>{'X-Device-Key': _deviceKey}),
-      );
-      final data = response.data?['event'];
-      if (data is! Map<String, dynamic>) {
-        throw const ApiException('Respuesta inesperada al realizar reserva rápida.');
-      }
-      return Event.fromJson(data);
-    } on DioException catch (error) {
-      throw _mapDioError(error);
-    }
-  }
-
   ApiException _mapDioError(DioException error) {
     final statusCode = error.response?.statusCode;
     final data = error.response?.data;
     final serverMessage = data is Map<String, dynamic> ? data['message'] as String? : null;
 
-    if (statusCode == 409) {
-      return ApiException(
-        serverMessage ?? 'La sala no está libre para el intervalo seleccionado.',
-        statusCode: 409,
-      );
-    }
     if (statusCode == 401) {
       return ApiException(
         serverMessage ?? 'Clave de dispositivo (X-Device-Key) inválida o no autorizada.',

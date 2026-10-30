@@ -3,14 +3,7 @@ import { z } from 'zod';
 import { createAuthProvider } from '../auth/index.js';
 import type { HubConfig } from '../config.js';
 import { createGraphClient, type GraphClient } from '../graph/index.js';
-import {
-  CalendarEventsCache,
-  computeSevenDayWindow,
-  isBlockingEvent,
-  parseEventDateTimeMs,
-  StateScheduler,
-  type StateChangeEvent,
-} from '../state/index.js';
+import { CalendarEventsCache, computeFourteenDayWindow, StateScheduler, type StateChangeEvent } from '../state/index.js';
 import {
   applyLocalCors,
   extractDeviceKeyHeader,
@@ -63,12 +56,10 @@ const streamQuerySchema = z.object({
   maxEvents: z.coerce.number().int().positive().optional(),
 });
 
-const bookBodySchema = z.object({
-  minutes: z.union([z.literal(15), z.literal(30), z.literal(60)], {
-    errorMap: () => ({ message: 'El campo "minutes" debe ser 15, 30 o 60.' }),
-  }),
-  subject: z.string().trim().optional(),
-});
+function enabledCalendars<T extends { id: string }>(calendars: T[], config: HubConfig): T[] {
+  const enabledIds = (config.SYNC_CALENDAR_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean);
+  return enabledIds.length ? calendars.filter((calendar) => enabledIds.includes(calendar.id)) : calendars;
+}
 
 export interface RouteDependencies {
   graphClient?: GraphClient;
@@ -86,9 +77,6 @@ function createNoopGraphClient(): GraphClient {
     },
     async listEvents() {
       return [];
-    },
-    async createEvent() {
-      throw new Error('Graph client no configurado.');
     },
   };
 }
@@ -145,6 +133,7 @@ export async function registerRoutes(
       graphClient,
       cache,
       pollSeconds: config.POLL_SECONDS,
+      syncCalendarIds: (config.SYNC_CALENDAR_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean),
       timezone: config.TIMEZONE,
       nowFn,
     });
@@ -209,7 +198,7 @@ export async function registerRoutes(
     try {
       let calendars = cache.getCalendars();
       if (calendars.length === 0) {
-        calendars = await graphClient.listCalendars();
+        calendars = enabledCalendars(await graphClient.listCalendars(), config);
         cache.setCalendars(calendars);
       }
       return { calendars };
@@ -243,7 +232,11 @@ export async function registerRoutes(
     }
 
     const calendarId = paramsResult.data.id;
-    const defaultWindow = computeSevenDayWindow(nowFn(), config.TIMEZONE);
+    const enabledIds = (config.SYNC_CALENDAR_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean);
+    if (enabledIds.length && !enabledIds.includes(calendarId)) {
+      return reply.code(404).send({ error: 'CalendarNotFound', message: 'El calendario no está habilitado para sincronización.' });
+    }
+    const defaultWindow = computeFourteenDayWindow(nowFn(), config.TIMEZONE);
     const fromIso = queryResult.data.from ?? defaultWindow.from;
     const toIso = queryResult.data.to ?? defaultWindow.to;
 
@@ -304,89 +297,6 @@ export async function registerRoutes(
       return reply.code(502).send({
         error: 'GraphUpstreamError',
         message: `No se pudo obtener el estado de la sala: ${detail}`,
-      });
-    }
-  });
-
-  // POST /api/rooms/:id/book
-  app.post('/api/rooms/:id/book', async (request, reply) => {
-    const paramsResult = idParamsSchema.safeParse(request.params);
-    if (!paramsResult.success) {
-      return reply.code(400).send({
-        error: 'ValidationError',
-        message: paramsResult.error.issues[0]?.message ?? 'Parámetro :id inválido.',
-      });
-    }
-
-    const bodyResult = bookBodySchema.safeParse(request.body);
-    if (!bodyResult.success) {
-      return reply.code(400).send({
-        error: 'ValidationError',
-        message: bodyResult.error.issues[0]?.message ?? 'Cuerpo de petición inválido.',
-      });
-    }
-
-    const roomId = paramsResult.data.id;
-    const { minutes, subject } = bodyResult.data;
-    const startTime = nowFn();
-    const endTime = new Date(startTime.getTime() + minutes * 60 * 1000);
-    const startMs = startTime.getTime();
-    const endMs = endTime.getTime();
-
-    try {
-      // 1. Asegurar que tenemos eventos actualizados para comprobar solapamiento
-      if (!cache.getSnapshot(roomId)) {
-        await scheduler.refreshCalendar(roomId, startTime);
-      }
-
-      const existingEvents = cache.getEvents(
-        roomId,
-        new Date(startMs - 60 * 60 * 1000),
-        new Date(endMs + 60 * 60 * 1000),
-      );
-
-      // 2. Comprobar solapamiento con cualquier evento bloqueante existente
-      const hasConflict = existingEvents.some((evt) => {
-        if (!isBlockingEvent(evt, { ignoreAllDay: config.IGNORE_ALL_DAY })) {
-          return false;
-        }
-        const eStart = parseEventDateTimeMs(evt.start, config.TIMEZONE);
-        const eEnd = parseEventDateTimeMs(evt.end, config.TIMEZONE);
-        // Solapamiento: el evento existente empieza antes de que termine el nuevo y termina después de que empiece
-        return eStart < endMs && eEnd > startMs;
-      });
-
-      if (hasConflict) {
-        return reply.code(409).send({
-          error: 'Conflict',
-          message:
-            'La sala no está libre para el intervalo seleccionado; ya existe una reunión solapada.',
-        });
-      }
-
-      // 3. Crear el evento en Microsoft Graph
-      const createdEvent = await graphClient.createEvent(roomId, {
-        subject: subject || `Reserva rápida (${minutes} min)`,
-        start: startTime.toISOString(),
-        end: endTime.toISOString(),
-      });
-
-      // 4. Refrescar el estado de la sala y emitir evento
-      await scheduler.refreshCalendar(roomId, startTime);
-      const updatedStatus = cache.getStatus(roomId, startTime);
-
-      return reply.code(201).send({
-        status: 'booked',
-        roomId,
-        event: createdEvent,
-        roomStatus: updatedStatus,
-      });
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      requestLogError(app, error, `Error al realizar reserva rápida en ${roomId}`);
-      return reply.code(502).send({
-        error: 'GraphUpstreamError',
-        message: `No se pudo crear la reserva en Microsoft Graph: ${detail}`,
       });
     }
   });

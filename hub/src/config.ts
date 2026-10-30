@@ -13,6 +13,7 @@ const rawEnvSchema = z.object({
   CLIENT_ID: z.string().min(1).default('unconfigured-client-id'),
   CLIENT_SECRET: z.string().optional(),
   ROOM_MAILBOXES: z.string().optional().default(''),
+  SYNC_CALENDAR_IDS: z.string().optional().default(''),
   TIMEZONE: z.string().min(1).default('Europe/Madrid'),
   PORT: z.coerce.number().int().positive().default(8080),
   DEVICE_KEYS: z.string().min(1).default('dev-device-key'),
@@ -27,6 +28,7 @@ export interface HubConfig {
   CLIENT_ID: string;
   CLIENT_SECRET?: string;
   ROOM_MAILBOXES: string;
+  SYNC_CALENDAR_IDS?: string;
   TIMEZONE: string;
   PORT: number;
   DEVICE_KEYS: string;
@@ -45,6 +47,7 @@ export function loadConfig(rawEnv: NodeJS.ProcessEnv = process.env): HubConfig {
     CLIENT_ID: parsed.CLIENT_ID,
     CLIENT_SECRET: parsed.CLIENT_SECRET,
     ROOM_MAILBOXES: parsed.ROOM_MAILBOXES,
+    SYNC_CALENDAR_IDS: parsed.SYNC_CALENDAR_IDS,
     TIMEZONE: parsed.TIMEZONE,
     PORT: parsed.PORT,
     DEVICE_KEYS: parsed.DEVICE_KEYS,

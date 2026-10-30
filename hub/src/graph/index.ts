@@ -5,7 +5,6 @@ export {
   GRAPH_BASE_URL,
   GraphApiError,
   parseRetryAfterMs,
-  type CreateEventInput,
   type GraphClient,
   type GraphClientLogger,
   type GraphClientOptions,

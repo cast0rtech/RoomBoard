@@ -46,16 +46,9 @@ export interface GraphClientOptions {
   logger?: GraphClientLogger;
 }
 
-export interface CreateEventInput {
-  subject?: string;
-  start: string | Date;
-  end: string | Date;
-}
-
 export interface GraphClient {
   listCalendars(): Promise<CalendarItem[]>;
   listEvents(calendarId: string, from: string | Date, to: string | Date): Promise<Event[]>;
-  createEvent(calendarId: string, input: CreateEventInput): Promise<Event>;
 }
 
 const defaultLogger: GraphClientLogger = {
@@ -130,11 +123,7 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
   const defaultRetryAfterMs = options.defaultRetryAfterMs ?? 2000;
   const logger = options.logger ?? defaultLogger;
 
-  async function requestJson(
-    url: string,
-    method: 'GET' | 'POST' = 'GET',
-    body?: unknown,
-  ): Promise<unknown> {
+  async function requestJson(url: string): Promise<unknown> {
     let tokenRefreshedAfter401 = false;
     let rateLimitAttempt = 0;
     let currentToken = await tokenProvider.getAccessToken(false);
@@ -146,14 +135,9 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
         Prefer: `outlook.timezone="${config.TIMEZONE}"`,
       };
 
-      if (body !== undefined) {
-        headers['Content-Type'] = 'application/json';
-      }
-
       const response = await fetchFn(url, {
-        method,
+        method: 'GET',
         headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
 
       if (response.status === 401 && !tokenRefreshedAfter401) {
@@ -286,35 +270,5 @@ export function createGraphClient(options: GraphClientOptions): GraphClient {
       return events;
     },
 
-    async createEvent(calendarId: string, input: CreateEventInput): Promise<Event> {
-      if (!calendarId.trim()) {
-        throw new Error('calendarId es obligatorio para crear una reserva.');
-      }
-
-      const encodedId = encodeURIComponent(calendarId);
-      const url =
-        config.AUTH_MODE === 'app'
-          ? `${GRAPH_BASE_URL}/users/${encodedId}/events`
-          : `${GRAPH_BASE_URL}/me/calendars/${encodedId}/events`;
-
-      const startIso = toIsoDateString(input.start, 'start');
-      const endIso = toIsoDateString(input.end, 'end');
-
-      const payload = {
-        subject: input.subject?.trim() || 'Reserva rápida (RoomBoard)',
-        start: {
-          dateTime: startIso,
-          timeZone: config.TIMEZONE,
-        },
-        end: {
-          dateTime: endIso,
-          timeZone: config.TIMEZONE,
-        },
-        showAs: 'busy',
-      };
-
-      const rawJson = await requestJson(url, 'POST', payload);
-      return mapGraphEvent(rawJson);
-    },
   };
 }

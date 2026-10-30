@@ -10,6 +10,7 @@ export {
 
 export {
   CalendarEventsCache,
+  computeFourteenDayWindow,
   computeSevenDayWindow,
   type CacheUpdateResult,
   type CalendarCacheSnapshot,

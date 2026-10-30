@@ -28,11 +28,8 @@ export interface CacheUpdateResult {
   events: CalendarEvent[];
 }
 
-/**
- * Calcula la ventana temporal de consulta: desde el inicio de hoy (00:00:00)
- * hasta el final del séptimo día siguiente (+7 días, 23:59:59.999) en la zona horaria indicada.
- */
-export function computeSevenDayWindow(now: Date = new Date(), timezone = 'UTC'): DateWindow {
+/** Calcula la ventana temporal desde hoy hasta el final del día dentro de 14 días. */
+export function computeFourteenDayWindow(now: Date = new Date(), timezone = 'UTC'): DateWindow {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -51,7 +48,7 @@ export function computeSevenDayWindow(now: Date = new Date(), timezone = 'UTC'):
   const localMidnightStr = `${map.year}-${map.month}-${map.day}T00:00:00`;
   const startMs = parseEventDateTimeMs(localMidnightStr, timezone);
 
-  const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const endDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
   const endParts = formatter.formatToParts(endDate);
   const endMap: Record<string, string> = {};
   for (const part of endParts) {
@@ -68,6 +65,9 @@ export function computeSevenDayWindow(now: Date = new Date(), timezone = 'UTC'):
     to: new Date(endMs).toISOString(),
   };
 }
+
+/** Alias de compatibilidad para consumidores antiguos. */
+export const computeSevenDayWindow = computeFourteenDayWindow;
 
 function serializeEventsDigest(events: readonly CalendarEvent[]): string {
   return JSON.stringify(
@@ -108,7 +108,7 @@ interface InternalCalendarEntry {
 }
 
 /**
- * Caché en memoria de calendarios, eventos (ventana hoy + 7 días) y estado por sala.
+ * Caché en memoria de calendarios, eventos (ventana de 14 días) y estado por sala.
  */
 export class CalendarEventsCache {
   private readonly entries = new Map<string, InternalCalendarEntry>();
@@ -146,7 +146,7 @@ export class CalendarEventsCache {
   ): CacheUpdateResult {
     const existing = this.entries.get(calendarId);
     const timezone = this.options.timezone ?? 'UTC';
-    const window = windowOverride ?? computeSevenDayWindow(now, timezone);
+    const window = windowOverride ?? computeFourteenDayWindow(now, timezone);
 
     const clonedEvents = [...events];
     const nextEventsDigest = serializeEventsDigest(clonedEvents);

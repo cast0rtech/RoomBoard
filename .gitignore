@@ -20,6 +20,7 @@ hub/coverage/
 app/.dart_tool/
 app/.packages
 app/build/
+app/.platform-scaffold-backup/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
 app/.metadata
